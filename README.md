@@ -1,5 +1,8 @@
 # rnn-model
-A Recurrent Neural Network for training and sampling character-level language models in Tensorflow
+A Recurrent Neural Network for training and sampling character-level language models in Tensorflow.
+
+In the example below we use a list of dutch cities as input and we generate new city names by learning the character level patterns in the existing names.
+The model generates new sequences of characters using the patterns in the input sequence.
 
 ## Usage
 The model has been implemented using python and tensorflow and structured to two parts: training and sampling.
@@ -12,10 +15,10 @@ If you want to experiment with the different hyperparameters and your own datase
 ### Training
 First you will need to train the network using train.py.
 
-The following command will run the training for 35000 iterations with a learning rate of 0.05. 
+The following command will run the training on the list of cities in nl_cities.csv, for 35000 iterations with a learning rate of 0.05.
 -state_size specifies the state size of the LSTM - Long Short Term Memory Cell
 ```
-python train.py -iterations 35000 -state_size 5 -lr 0.05
+python train.py input='nl_cities.csv' -iterations 35000 -state_size 5 -lr 0.05
 ```
 
 During training I would recommend to keep track of the value of the cost, and sample every x iteration. 
