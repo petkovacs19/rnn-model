@@ -9,14 +9,14 @@ class LSTMModel():
     """
 
     @classmethod
-    def create_from_args(cls):
+    def create_from_args(cls, is_sample_mode=False):
         """
         Create an instance of this class from the passed arguments
         :param args: object from argparse
         :return: instance of TrainModel
         """
         args = cls.parse_args()
-        return LSTMModel(args.input, args.iterations, args.state_size, args.lr, args.sample_every, args.sample_size)
+        return LSTMModel(args.input, args.iterations, args.state_size, args.lr, args.sample_every, args.sample_size, is_sample_mode, args.first_value)
 
     @classmethod
     def parse_args(cls):
@@ -33,10 +33,11 @@ class LSTMModel():
         parser.add_argument('-sample_every', help='Sample during training', type=int, default=0)
         parser.add_argument('-sample_size', help='Number of words to sample', type=int, default=10)
         parser.add_argument('-input', help='File containing sequence of words', required=True)
+        parser.add_argument('-first_value', help='First character of the sample data in sample_mode', type=str)
 
         return parser.parse_args()
 
-    def __init__(self, input_file, iterations, state_size, learning_rate, sample_every, sample_size):
+    def __init__(self, input_file, iterations, state_size, learning_rate, sample_every, sample_size, is_sample_mode, first_value):
         """
 
         :param filename:
@@ -53,6 +54,8 @@ class LSTMModel():
         self.sample_every = sample_every
         self.sample_size = sample_size
         self.batch_size = 1
+        self.is_sample_mode = is_sample_mode
+
         print("Configuration used")
         print("Input used", self.input_file)
         print("Number of iterations ", self.iterations)
@@ -72,6 +75,15 @@ class LSTMModel():
 
         self.char_to_class_id = {ch: i for i, ch in enumerate(sorted(chars))}
         self.class_id_to_char = {i: ch for i, ch in enumerate(sorted(chars))}
+
+        if first_value is not None:
+            if first_value not in self.char_to_class_id:
+                raise ValueError('First value must be in dictionary')
+            if not self.is_sample_mode:
+                raise ValueError('First value can only be specified in sample mode')
+            self.first_value = self.char_to_class_id[first_value]
+        else:
+            self.first_value = -1
 
     def create_graph(self, num_classes):
         """
@@ -122,56 +134,15 @@ class LSTMModel():
 
         return current_state, total_loss
 
-    def run(self):
-        if self.batch_size != 1:
-            raise ValueError("batch_size greater then 1 not supported yet")
-
-        with open(self.input_file) as f:
-            datarows = f.readlines()
-        datarows = [x.lower().strip() for x in datarows]
-        np.random.shuffle(datarows)
-
-        current_state, total_loss = self.create_graph(self.num_classes)
-
-        train_step = tf.train.AdamOptimizer(self.learning_rate).minimize(total_loss)
-
-        with tf.Session() as sess:
-            # Initialize variables
-            sess.run(tf.global_variables_initializer())
-
-            for step in range(1, self.iterations + 1):
-                # Zero Initialize the hidden and cell state of the lstm
-                _current_state = np.zeros((2, self.batch_size, self.state_size))
-                row_index = step % len(datarows)
-
-                X_train = [-1] + [self.char_to_class_id[ch] for ch in datarows[row_index]]
-                Y_train = X_train[1:] + [self.char_to_class_id["\n"]]
-
-                # Reshape data to get 1x28 shaped element
-                batch_x = np.expand_dims(np.array(X_train), axis=0)
-                batch_y = np.expand_dims(np.array(Y_train), axis=0)
-
-                cost, _current_state, _ = sess.run([total_loss, current_state, train_step],
-                                                   feed_dict={
-                                                       self.X: batch_x,
-                                                       self.Y: batch_y,
-                                                       self.cell_state: _current_state[0],
-                                                       self.hidden_state: _current_state[1]})
-
-                # Print Loss and sample from trained grapd
-                if self.sample_every != 0 and step % self.sample_every == 0 or self.iterations == step:
-                    print("Step " + str(step) + ", Loss= " + "{:.4f}".format(cost))
-                    self.sample(sess, current_state, self.sample_size)
-
     def sample(self, sess, current_state, sample_size):
         for sample in range(sample_size):
             _current_sample_state = np.zeros((2, self.batch_size, self.state_size))
             # sample a prediction
-            idx = -1
+            idx = self.first_value
             newline_character = self.char_to_class_id['\n']
             counter = 0
-            indices = []
-            X_eval = [-1]
+            indices = [idx]
+            X_eval = [idx]
             X_eval = np.expand_dims(np.array(X_eval), axis=0)
             while (idx != newline_character and counter != 50):
                 #                         np.random.seed(counter+sample)
@@ -192,3 +163,54 @@ class LSTMModel():
                 X_eval = np.expand_dims(np.array(X_eval), axis=0)
                 counter += 1
             print(''.join([self.class_id_to_char[i] for i in indices]).strip())
+
+    def train(self, sess, current_state, total_loss, train_step):
+        with open(self.input_file) as f:
+            datarows = f.readlines()
+        datarows = [x.lower().strip() for x in datarows]
+        np.random.shuffle(datarows)
+
+        for step in range(1, self.iterations + 1):
+            # Zero Initialize the hidden and cell state of the lstm
+            _current_state = np.zeros((2, self.batch_size, self.state_size))
+            row_index = step % len(datarows)
+
+            X_train = [-1] + [self.char_to_class_id[ch] for ch in datarows[row_index]]
+            Y_train = X_train[1:] + [self.char_to_class_id["\n"]]
+
+            # Reshape data to get 1x28 shaped element
+            batch_x = np.expand_dims(np.array(X_train), axis=0)
+            batch_y = np.expand_dims(np.array(Y_train), axis=0)
+
+            cost, _current_state, _ = sess.run([total_loss, current_state, train_step],
+                                               feed_dict={
+                                                   self.X: batch_x,
+                                                   self.Y: batch_y,
+                                                   self.cell_state: _current_state[0],
+                                                   self.hidden_state: _current_state[1]})
+
+            # Print Loss and sample from trained grapd
+            if self.sample_every != 0 and step % self.sample_every == 0 or self.iterations == step:
+                print("Step " + str(step) + ", Loss= " + "{:.4f}".format(cost))
+                self.sample(sess, current_state, self.sample_size)
+
+    def run(self):
+        if self.batch_size != 1:
+            raise ValueError("batch_size greater then 1 not supported yet")
+
+        current_state, total_loss = self.create_graph(self.num_classes)
+
+        train_step = tf.train.AdamOptimizer(self.learning_rate).minimize(total_loss)
+
+        saver = tf.train.Saver()
+
+        with tf.Session() as sess:
+
+            if(self.is_sample_mode):
+                saver.restore(sess, "saved_model/model")
+                self.sample(sess,current_state,self.sample_size)
+            else:
+                # Initialize variables
+                sess.run(tf.global_variables_initializer())
+                self.train(sess, current_state, total_loss, train_step)
+                saver.save(sess, "saved_model/model")

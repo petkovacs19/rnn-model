@@ -43,7 +43,7 @@ python sample.py -sample_size 100
 Here is another example with the first character specified as 'a'
 
 ```
-python sample.py -sample_size 100 -first_input='a'
+python sample.py -sample_size 100 -first_value='a'
 ```
 
 The sampling works the following way: 
