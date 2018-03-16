@@ -141,7 +141,9 @@ class LSTMModel():
             idx = self.first_value
             newline_character = self.char_to_class_id['\n']
             counter = 0
-            indices = [idx]
+            indices = []
+            if idx != -1:
+                indices.append(idx)
             X_eval = [idx]
             X_eval = np.expand_dims(np.array(X_eval), axis=0)
             while (idx != newline_character and counter != 50):
