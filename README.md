@@ -18,7 +18,7 @@ First you will need to train the network using train.py.
 The following command will run the training on the list of cities in nl_cities.csv, for 35000 iterations with a learning rate of 0.05.
 -state_size specifies the state size of the LSTM - Long Short Term Memory Cell
 ```
-python train.py input='nl_cities.csv' -iterations 35000 -state_size 5 -lr 0.05
+python train.py -input nl_cities.csv -iterations 35000 -state_size 5 -lr 0.05
 ```
 
 During training I would recommend to keep track of the value of the cost, and sample every x iteration. 
