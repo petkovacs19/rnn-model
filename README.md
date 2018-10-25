@@ -1,4 +1,4 @@
-# rnn-model
+# Character level language model
 A Recurrent Neural Network for training and sampling character-level language models in Tensorflow.
 
 In the example below we use a list of dutch cities as input and we generate new city names by learning the character level patterns in the existing names.
